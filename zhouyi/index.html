@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>周易起卦系统 V2.5</title>
+    <style>
+        :root { --primary: #5d4037; --accent: #b71c1c; --gold: #d4a017; --bg: #fdfaf5; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: "STKaiti", "Kaiti", "楷体", serif; background: var(--bg); margin: 0; padding: 10px; color: #333; }
+        .container { width: 100%; max-width: 500px; margin: 0 auto; background: white; padding: 15px; border: 1px solid #d4c4a8; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; }
+        .mode-switch { display: flex; gap: 5px; }
+        .tab { padding: 8px 12px; cursor: pointer; border: 1px solid var(--primary); color: var(--primary); border-radius: 20px; font-size: 0.8rem; }
+        .tab.active { background: var(--primary); color: white; }
+        .gua-input { width: 100%; padding: 12px; border: 1px solid #d4c4a8; border-radius: 8px; font-family: inherit; font-size: 1rem; color: var(--primary); background: #fffcf5; outline: none; text-align: center; margin-bottom: 10px; }
+        .coin-wrap { display: flex; justify-content: center; gap: 12px; margin: 20px 0; perspective: 1000px; }
+        .coin { width: 70px; height: 70px; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
+        .coin-face { position: absolute; width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; border: 3px solid #b8860b; font-weight: bold; font-size: 1.4rem; }
+        .face-front { background: radial-gradient(circle, #ffeb3b, #fbc02d); color: #5d4037; } 
+        .face-back { background: radial-gradient(circle, #f5f5f5, #bdbdbd); color: #616161; transform: rotateY(180deg); }
+        .spinning { animation: fastSpin 0.7s linear infinite; }
+        @keyframes fastSpin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(1080deg); } }
+        .gua-columns { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 15px; }
+        .gua-box { width: 100%; text-align: center; padding: 12px; background: #fffcf5; border: 1px solid #eaddca; border-radius: 8px; }
+        .line-wrapper { display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; margin-bottom: 8px; }
+        .block { height: 14px; border-radius: 2px; }
+        .yang-b { width: 130px; background: var(--accent); }
+        .yin-b { width: 130px; display: flex; justify-content: space-between; }
+        .yin-p { width: 60px; height: 14px; background: var(--primary); }
+        .move-mark { position: absolute; right: 25px; color: var(--gold); font-size: 22px; font-weight: bold; }
+        .btn { width: 100%; max-width: 280px; background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.1rem; cursor: pointer; border-radius: 30px; margin: 15px auto; display: block; }
+        .btn-reload { background: #795548; margin-top: 20px; margin-bottom: 20px; }
+        .guide-box { font-size: 1.1rem; color: var(--primary); font-weight: bold; padding: 15px; background: white; border: 2px solid var(--gold); border-radius: 8px; line-height: 1.6; text-align: center; margin-top: 10px; }
+        .rule-note { padding: 15px; background: #f9f4e8; border: 1px dashed #d4c4a8; border-radius: 8px; font-size: 0.85rem; line-height: 1.6; color: #5d4037; }
+        .history-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-nav">
+        <div class="mode-switch">
+            <span class="tab active" onclick="switchMode('auto')" id="tab-auto">起卦</span>
+            <span class="tab" onclick="switchMode('manual')" id="tab-manual">手动</span>
+            <span class="tab" onclick="toggleHistory(true)">历史</span>
+        </div>
+        <div style="font-size: 0.7rem; color: #999;">V2.5</div>
+    </div>
+
+    <div id="auto-panel">
+        <input type="text" id="gua-event" class="gua-input" placeholder="静心默念，摇掷六爻">
+        <div class="coin-wrap">
+            <div class="coin" id="c0"><div class="coin-face face-front">阳</div><div class="coin-face face-back">阴</div></div>
+            <div class="coin" id="c1"><div class="coin-face face-front">阳</div><div class="coin-face face-back">阴</div></div>
+            <div class="coin" id="c2"><div class="coin-face face-front">阳</div><div class="coin-face face-back">阴</div></div>
+        </div>
+        <button id="rollBtn" class="btn" onclick="startToss()">开始起卦</button>
+    </div>
+
+    <div id="manual-panel" style="display:none;">
+        <input type="text" id="gua-event-manual" class="gua-input" placeholder="输入占测事宜">
+        <div id="selectors-container"></div>
+        <button class="btn" onclick="executeManual()">生成卦象</button>
+    </div>
+
+    <div id="guaView" class="gua-columns" style="display:none;">
+        <div id="event-display" style="text-align:center; color:var(--accent); font-weight:bold; margin-bottom:5px;"></div>
+        <div class="gua-box">
+            <div id="oname_main" style="font-size:1.1rem; font-weight:bold; margin-bottom:10px;"></div>
+            <div id="originalLines" style="display:flex; flex-direction:column-reverse;"></div>
+        </div>
+        <div id="change-label" style="display:none; color:#999; font-size:0.8rem; margin:10px 0;">▼ 之卦 ▼</div>
+        <div class="gua-box" id="changedBox" style="display:none;">
+            <div id="cname_main" style="font-size:1.1rem; font-weight:bold; margin-bottom:10px;"></div>
+            <div id="changedLines" style="display:flex; flex-direction:column-reverse;"></div>
+        </div>
+    </div>
+
+    <div id="result-area" style="display:none; margin-top:20px; border-top:2px solid #5d4037; padding-top:15px;">
+        <div id="final-advice" class="guide-box"></div>
+        
+        <button onclick="location.reload()" class="btn btn-reload">重新起卦</button>
+
+        <div class="rule-note">
+            <h4 style="margin:0 0 8px 0; border-bottom:1px solid #d4c4a8; display:inline-block;">朱熹《易学启蒙》占则：</h4><br>
+            • <b>六爻不变</b>：静卦，依本卦卦辞占。<br>
+            • <b>一爻变</b>：依本卦变爻辞占。<br>
+            • <b>二爻变</b>：依本卦二变爻辞占，以上爻为主。<br>
+            • <b>三爻变</b>：综合本卦(贞)及之卦(悔)卦辞。<br>
+            • <b>四爻变</b>：依之卦二不变爻辞占，以下爻为主。<br>
+            • <b>五爻变</b>：依之卦不变爻辞占。<br>
+            • <b>六爻变</b>：乾坤占用九/用六，余卦占之卦卦辞。
+        </div>
+    </div>
+</div>
+
+<div id="history-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999; justify-content:center; align-items:center;">
+    <div style="background:white; width:90%; max-height:85%; padding:20px; border-radius:12px; overflow-y:auto; position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:10px; margin-bottom:10px;">
+            <h3 style="margin:0; color:var(--primary);">占卜历史</h3>
+            <button onclick="toggleHistory(false)" style="background:var(--accent); color:white; border:none; padding:5px 15px; border-radius:15px; cursor:pointer;">返回</button>
+        </div>
+        <div id="history-list"></div>
+    </div>
+</div>
+
+<script>
+const DB = {"111111":[1,"乾为天"],"000000":[2,"坤为地"],"100010":[3,"水雷屯"],"010001":[4,"山水蒙"],"111010":[5,"水天需"],"010111":[6,"天水讼"],"000010":[7,"地水师"],"010000":[8,"水地比"],"111011":[9,"风天小畜"],"110111":[10,"天泽履"],"000111":[11,"地天泰"],"111000":[12,"天地否"],"101111":[13,"天火同人"],"111101":[14,"火天大有"],"000100":[15,"地山谦"],"001000":[16,"雷地豫"],"100110":[17,"泽雷随"],"011001":[18,"山风蛊"],"000011":[19,"地泽临"],"110000":[20,"风地观"],"101001":[21,"火雷噬嗑"],"100101":[22,"山火贲"],"000001":[23,"山地剥"],"100000":[24,"地雷复"],"100111":[25,"天雷无妄"],"111001":[26,"山天大畜"],"100001":[27,"山雷颐"],"011110":[28,"泽风大过"],"010010":[29,"坎为水"],"101101":[30,"离为火"],"001110":[31,"泽山咸"],"011100":[32,"雷风恒"],"001111":[33,"天山遁"],"111100":[34,"雷天大壮"],"000101":[35,"火地晋"],"101000":[36,"地火明夷"],"101011":[37,"风火家人"],"110101":[38,"火泽睽"],"001010":[39,"水山蹇"],"010100":[40,"雷水解"],"110001":[41,"山泽损"],"100011":[42,"风雷益"],"111110":[43,"泽天夬"],"011111":[44,"天风姤"],"000110":[45,"泽地萃"],"011000":[46,"地风升"],"010110":[47,"泽水困"],"011010":[48,"水风井"],"101110":[49,"泽火革"],"011101":[50,"火风鼎"],"100100":[51,"震为雷"],"001001":[52,"艮为山"],"001011":[53,"风山渐"],"110100":[54,"雷泽归妹"],"101100":[55,"雷火丰"],"001101":[56,"火山旅"],"011011":[57,"巽为风"],"110110":[58,"兑为泽"],"010011":[59,"风水涣"],"110010":[60,"水泽节"],"110011":[61,"风泽中孚"],"001100":[62,"雷山小过"],"101010":[63,"水火既济"],"010101":[64,"火水未济"]};
+
+let results = [], step = 0;
+
+function switchMode(m) {
+    document.getElementById('auto-panel').style.display = m==='auto'?'block':'none';
+    document.getElementById('manual-panel').style.display = m==='manual'?'block':'none';
+    document.getElementById('tab-auto').className = m==='auto'?'tab active':'tab';
+    document.getElementById('tab-manual').className = m==='manual'?'tab active':'tab';
+    if(m==='manual') {
+        const names = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"];
+        document.getElementById('selectors-container').innerHTML = names.map((n, i) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0;">
+                <b style="color:#5d4037">${n}</b>
+                <select id="yao-${i}" style="padding:8px; border-radius:5px; border:1px solid #d4c4a8; width:150px;">
+                    <option value="7">少阳 —</option><option value="8">少阴 - -</option>
+                    <option value="9">老阳 — ○</option><option value="6">老阴 - - ×</option>
+                </select>
+            </div>`).reverse().join('');
+    }
+}
+
+function startToss() {
+    const btn = document.getElementById('rollBtn');
+    btn.disabled = true;
+    const cs = [document.getElementById('c0'), document.getElementById('c1'), document.getElementById('c2')];
+    cs.forEach(c => c.classList.add('spinning'));
+    setTimeout(() => {
+        cs.forEach(c => c.classList.remove('spinning'));
+        let toss = [Math.random()>0.5?3:2, Math.random()>0.5?3:2, Math.random()>0.5?3:2];
+        let sum = toss.reduce((a,b)=>a+b, 0);
+        results.push(sum);
+        toss.forEach((v, i) => cs[i].style.transform = v===3?'rotateY(0deg)':'rotateY(180deg)');
+        document.getElementById('guaView').style.display = 'flex';
+        renderLine(step, sum);
+        step++;
+        if(step < 6) { btn.disabled = false; btn.innerText = `摇掷第 ${step+1} 爻`; } 
+        else { btn.innerText = "起卦完成"; showFinal(); }
+    }, 600);
+}
+
+function renderLine(idx, sum) {
+    const isYangO = (sum === 7 || sum === 9), isMove = (sum === 6 || sum === 9);
+    const isYangC = isMove ? !isYangO : isYangO;
+    const block = (y) => y ? `<div class="block yang-b"></div>` : `<div class="block yin-b"><div class="yin-p"></div><div class="yin-p"></div></div>`;
+    let ol = document.createElement('div'); ol.className = "line-wrapper";
+    ol.innerHTML = block(isYangO) + (isMove?'<span class="move-mark">○</span>':'');
+    document.getElementById('originalLines').appendChild(ol);
+    let cl = document.createElement('div'); cl.className = "line-wrapper";
+    cl.innerHTML = block(isYangC);
+    document.getElementById('changedLines').appendChild(cl);
+}
+
+function showFinal(historyEventName = null) {
+    let b1 = results.map(s=>(s===7||s===9?1:0)).join("");
+    let b2 = results.map(s=>(s===6?1:(s===9?0:(s===7?1:0)))).join("");
+    let moves = []; results.forEach((s,i)=>{if(s===6||s===9) moves.push(i+1)});
+    let g1 = DB[b1], g2 = DB[b2];
+
+    const eventName = historyEventName || document.getElementById('gua-event').value || document.getElementById('gua-event-manual').value || "静心所卜";
+    document.getElementById('event-display').innerText = "所测：" + eventName;
+    document.getElementById('oname_main').innerText = `本卦：${g1[1]}`;
+    document.getElementById('cname_main').innerText = `之卦：${g2[1]}`;
+    document.getElementById('guaView').style.display = 'flex';
+    document.getElementById('result-area').style.display = 'block';
+    
+    document.getElementById('change-label').style.display = moves.length > 0 ? 'block' : 'none';
+    document.getElementById('changedBox').style.display = moves.length > 0 ? 'block' : 'none';
+
+    let n = moves.length, advice = "";
+    if(n===0) advice = `【六爻不变：静卦】<br>占：[第 ${g1[0]} 卦]《${g1[1]}》卦辞`;
+    else if(n===1) advice = `【一爻变】<br>占：[第 ${g1[0]} 卦]《${g1[1]}》第 ${moves[0]} 爻辞`;
+    else if(n===2) advice = `【二爻变】<br>占：[第 ${g1[0]} 卦]《${g1[1]}》第 ${moves[0]}、${moves[1]} 爻辞<br>(以上爻 ${moves[1]} 为主)`;
+    else if(n===3) advice = `【三爻变】<br>综合研读：<br>本卦(贞)：[第 ${g1[0]} 卦]《${g1[1]}》卦辞<br>之卦(悔)：[第 ${g2[0]} 卦]《${g2[1]}》卦辞`;
+    else if(n===4) {
+        let un = [1,2,3,4,5,6].filter(x => !moves.includes(x));
+        advice = `【四爻变】<br>占：[第 ${g2[0]} 卦]《${g2[1]}》第 ${un[0]}、${un[1]} 爻辞<br>(以下爻 ${un[0]} 为主)`;
+    }
+    else if(n===5) {
+        let un = [1,2,3,4,5,6].find(x => !moves.includes(x));
+        advice = `【五爻变】<br>占：[第 ${g2[0]} 卦]《${g2[1]}》不变爻辞`;
+    }
+    else if(n===6) {
+        if(g1[0]===1) advice = `【六爻皆变】<br>占：[第 1 卦] 乾卦用九爻辞`;
+        else if(g1[0]===2) advice = `【六爻皆变】<br>占：[第 2 卦] 坤卦用六爻辞`;
+        else advice = `【六爻皆变】<br>占：[第 ${g2[0]} 卦]《${g2[1]}》卦辞`;
+    }
+    document.getElementById('final-advice').innerHTML = advice;
+    if(!historyEventName) saveHistory(g1, results, eventName);
+}
+
+function executeManual() {
+    results = []; step = 6;
+    document.getElementById('originalLines').innerHTML = '';
+    document.getElementById('changedLines').innerHTML = '';
+    for(let i=0; i<6; i++) {
+        let v = parseInt(document.getElementById(`yao-${i}`).value);
+        results.push(v); renderLine(i, v);
+    }
+    showFinal();
+}
+
+function saveHistory(g, d, eventName) {
+    let h = JSON.parse(localStorage.getItem('YiFinalStorage') || '[]');
+    h.unshift({ time: new Date().toLocaleString(), name: g[1], id: g[0], data: [...d], event: eventName });
+    localStorage.setItem('YiFinalStorage', JSON.stringify(h.slice(0, 30)));
+}
+
+function toggleHistory(s) {
+    const m = document.getElementById('history-modal');
+    m.style.display = s ? 'flex' : 'none';
+    if(s) {
+        let h = JSON.parse(localStorage.getItem('YiFinalStorage') || '[]');
+        document.getElementById('history-list').innerHTML = h.map((x, i) => `
+            <div class="history-item" onclick="loadHistory(${i})" style="padding:12px; border-bottom:1px solid #eee;">
+                <div style="font-size:0.75rem; color:#888;">${x.time}</div>
+                <div style="color:var(--accent); font-weight:bold;">事：${x.event}</div>
+                <div style="color:#333;">[第 ${x.id} 卦] ${x.name}</div>
+            </div>`).join('') || '<div style="padding:20px; text-align:center; color:#999;">暂无记录</div>';
+    }
+}
+
+function loadHistory(idx) {
+    let h = JSON.parse(localStorage.getItem('YiFinalStorage') || '[]');
+    let item = h[idx];
+    results = [...item.data]; step = 6;
+    document.getElementById('originalLines').innerHTML = '';
+    document.getElementById('changedLines').innerHTML = '';
+    results.forEach((v, i) => renderLine(i, v));
+    showFinal(item.event);
+    toggleHistory(false);
+}
+</script>
+</body>
+</html>
